@@ -17,6 +17,11 @@ class Aht20:
   static RESET-CMD_    ::= 0xBA
   static STATUS-CMD_   ::= 0x71
 
+  static BUSY_       ::= 0b10000000
+  static CALIBRATED_ ::= 0b00001000
+
+  static RETURN-BYTES_ ::= 6
+
   static WATER-VAPOR ::= 17.62
   static BAROMETRIC-PRESSURE ::= 243.5
 
