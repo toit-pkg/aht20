@@ -133,6 +133,15 @@ class Aht20:
     return (dev_.read 1)[0]
 
   /**
+  Run sensor calibration.
+  */
+  run-calibration -> none:
+    dev_.write #[INIT-CMD_, 0x08, 0x00]
+    sleep --ms=40
+    check-busy-bit_
+    return
+
+  /**
   Whether the device calibration is complete.
   */
   is-calibrated -> bool:
