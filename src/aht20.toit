@@ -80,18 +80,24 @@ class Aht20:
     it is a better measure of true moisture content, independent of current
     temperature.  In other words - it is the temperature at which condensation
     would start to form.
+
+  Dew point is calculated here from temperature and humidity reads and based on
+    Magnus approximation.  It is returned in degrees Celsius.  Default constants
+    are $barometric-pressure = 243.12c, and $water-vapor = 17.62, and are
+    typical values for indoor/environmental use.  They can be set to other
+    fitting values as the use case dictates.
   */
-  read-dew-point -> float:
+  read-dew-point --barometric-pressure=BAROMETRIC-PRESSURE --water-vapor=WATER-VAPOR -> float:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
     sleep --ms=80
-
     check-busy-bit_
-    dat := dev_.read 6
-    hum := compute-hum_ dat
-    temp := compute-temp_ dat
 
-    gamma := math.log (hum / 100) + WATER-VAPOR * temp / (BAROMETRIC-PRESSURE + temp)
-    return BAROMETRIC-PRESSURE * gamma / (WATER-VAPOR - gamma)
+    data := dev_.read RETURN-BYTES_
+    hum := compute-hum_ data
+    temp := compute-temp_ data
+
+    gamma := (math.log (hum / 100)) + (water-vapor * temp / (barometric-pressure + temp))
+    return barometric-pressure * gamma / (water-vapor - gamma)
 
   /**
   Compute humidity from the raw byte array.
@@ -110,9 +116,9 @@ class Aht20:
   /**
   Wait for busy bit to clear to indicate idle state.
   */
-  check-busy-bit_:
+  check-busy-bit_ -> none:
     tries := 5
-    while (read-status & 0x80 != 0):
+    while (read-status & BUSY_ != 0):
       tries--
       if tries == 0: throw "sensor busy!"
       sleep --ms=1
