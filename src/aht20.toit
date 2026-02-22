@@ -5,6 +5,7 @@
 import binary
 import serial.device as serial
 import math
+import log
 
 /**
 Driver for the AHT10/AHT15/AHT20/AHT21/AHT25 sensors.
@@ -26,8 +27,10 @@ class Aht20:
   static BAROMETRIC-PRESSURE ::= 243.5
 
   dev_/serial.Device ::= ?
+  logger_/log.Logger ::= ?
 
-  constructor dev/serial.Device:
+  constructor dev/serial.Device --logger/log.Logger=log.default:
+    logger_ = logger.with-name "aht20"
     dev_ = dev
 
     // Initialize the sensor.
@@ -128,3 +131,16 @@ class Aht20:
   read-status:
     dev_.write #[STATUS-CMD_]
     return (dev_.read 1)[0]
+
+  /**
+  Whether the device calibration is complete.
+  */
+  is-calibrated -> bool:
+    return read-status & CALIBRATED_ != 0
+
+  /**
+  Initialise the sensor.
+  */
+  initialize -> none:
+    dev_.write #[INIT-CMD_, 0x08, 0x00]
+    sleep --ms=10
