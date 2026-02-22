@@ -84,7 +84,7 @@ class Aht20:
     hum := compute-hum_ dat
     temp := compute-temp_ dat
 
-    gamma := math.log(hum / 100) + WATER-VAPOR * temp / (BAROMETRIC-PRESSURE + temp)
+    gamma := math.log (hum / 100) + WATER-VAPOR * temp / (BAROMETRIC-PRESSURE + temp)
     return BAROMETRIC-PRESSURE * gamma / (WATER-VAPOR - gamma)
 
   /**

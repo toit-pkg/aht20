@@ -9,8 +9,8 @@ import aht20 show *
 
 main:
   bus := i2c.Bus
-    --sda=gpio.Pin 21
-    --scl=gpio.Pin 22
+    --sda=gpio.Pin 19
+    --scl=gpio.Pin 20
 
   device := bus.device Aht20.I2C-ADDRESS
   driver := Aht20 device
