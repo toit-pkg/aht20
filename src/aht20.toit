@@ -117,13 +117,16 @@ class Aht20:
 
   /**
   Wait for busy bit to clear to indicate idle state.
+
+  Waits a maximum of $tries * $sleep-ms.  If timeout exceeded, will log and
+    will not throw.
   */
-  check-busy-bit_ -> none:
-    tries := 5
+  check-busy-bit_ --tries/int=5 --sleep-ms/int=1 -> none:
     while (read-status & BUSY_ != 0):
       tries--
-      if tries == 0: throw "sensor busy!"
-      sleep --ms=1
+      if tries == 0:
+        logger_.error "sensor busy timeout" --tags={"tries": tries, "sleep": sleep-ms}
+      sleep --ms=sleep-ms
 
   /**
   Perform a soft reset.
