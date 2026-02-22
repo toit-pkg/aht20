@@ -1,3 +1,166 @@
-import .driver
+// Copyright (C) 2026 Toitware Contributors. All rights reserved.
+// Original code Copyright (c) 2022 David Lao.
+// Use of this source code is governed by an MIT-style license that can be found
+// in the LICENSE file.
+import binary
+import serial.device as serial
+import math
+import log
 
-export *
+/**
+Driver for the AHT10/AHT15/AHT20/AHT21/AHT25 sensors.
+*/
+class Aht20:
+  static I2C-ADDRESS   ::= 0x38
+
+  static INIT-CMD_     ::= 0xBE
+  static MEASURE-CMD_  ::= 0xAC
+  static RESET-CMD_    ::= 0xBA
+  static STATUS-CMD_   ::= 0x71
+
+  static BUSY_       ::= 0b10000000
+  static CALIBRATED_ ::= 0b00001000
+
+  static RETURN-BYTES_ ::= 6
+
+  static WATER-VAPOR ::= 17.62
+  static BAROMETRIC-PRESSURE ::= 243.12
+
+  dev_/serial.Device ::= ?
+  logger_/log.Logger ::= ?
+
+  constructor dev/serial.Device --logger/log.Logger=log.default:
+    logger_ = logger.with-name "aht20"
+    dev_ = dev
+
+    // Initialize the sensor.
+    sleep --ms=40
+    initialize
+
+    // Verify calibration is complete by checking calibration bit.
+    if not is-calibrated:
+      logger_.warn "device not calibrated - calibrating"
+      run-calibration
+      if not is-calibrated:
+        throw "device initialization failed"
+
+  /**
+  Reads the humidity.
+
+  Humidity is returned in percentage value.
+  */
+  read-humidity -> float:
+    dev_.write #[MEASURE-CMD_, 0x33, 0x00]
+    sleep --ms=80
+
+    check-busy-bit_
+    dat := dev_.read RETURN-BYTES_
+    return compute-hum_ dat
+
+  /**
+  Reads the temperature.
+
+  Temperature is returned in degrees Celsius.
+  */
+  read-temperature -> float:
+    dev_.write #[MEASURE-CMD_, 0x33, 0x00]
+    sleep --ms=80
+
+    check-busy-bit_
+    dat := dev_.read RETURN-BYTES_
+    return compute-temp_ dat
+
+  /**
+  Calculates the dew point.
+
+  If moist air cools down enough, it reaches a point where it cannot hold all
+    the water vapor it currently contains. That temperature is the dew point.
+    Relative humidity (RH) depends on temperature whereas the dew point does not
+    change unless the actual amount of moisture in the air changes.  This means
+    it is a better measure of true moisture content, independent of current
+    temperature.  In other words - it is the temperature at which condensation
+    would start to form.
+
+  Dew point is calculated here from temperature and humidity reads and based on
+    Magnus approximation.  It is returned in degrees Celsius.  Default constants
+    are $barometric-pressure = 243.12c, and $water-vapor = 17.62, and are
+    typical values for indoor/environmental use.  They can be set to other
+    fitting values as the use case dictates.
+  */
+  read-dew-point -> float
+      --barometric-pressure/float=BAROMETRIC-PRESSURE
+      --water-vapor/float=WATER-VAPOR:
+    dev_.write #[MEASURE-CMD_, 0x33, 0x00]
+    sleep --ms=80
+    check-busy-bit_
+
+    data := dev_.read RETURN-BYTES_
+    hum := compute-hum_ data
+    temp := compute-temp_ data
+
+    gamma := (math.log (hum / 100)) + (water-vapor * temp / (barometric-pressure + temp))
+    return barometric-pressure * gamma / (water-vapor - gamma)
+
+  /**
+  Compute humidity from the raw byte array.
+  */
+  compute-hum_ dat/ByteArray -> float:
+    hum := ((dat[1] << 16) | (dat[2] << 8) | dat[3]) >> 4
+    return hum * 100.0 / 1048576
+
+  /**
+  Compute temperature from the raw byte array.
+  */
+  compute-temp_ dat/ByteArray -> float:
+    temp := ((dat[3] & 0x0F) << 16) | (dat[4] << 8) | dat[5]
+    return ((200.0 * temp) / 1048576) - 50
+
+  /**
+  Wait for busy bit to clear to indicate idle state.
+
+  Waits a maximum of $tries * $sleep-ms.  If timeout exceeded, will log and
+    will not throw.
+  */
+  check-busy-bit_ --tries/int=5 --sleep-ms/int=1 -> none:
+    while (read-status & BUSY_ != 0):
+      tries--
+      if tries == 0:
+        logger_.error "sensor busy timeout" --tags={"tries": tries, "sleep": sleep-ms}
+      sleep --ms=sleep-ms
+
+  /**
+  Perform a soft reset.
+  */
+  soft-reset -> none:
+    dev_.write #[RESET-CMD_]
+
+  /**
+  Read sensor status.
+  */
+  read-status -> int:
+    dev_.write #[STATUS-CMD_]
+    return (dev_.read 1)[0]
+
+  /**
+  Run sensor calibration.
+  */
+  run-calibration -> none:
+    dev_.write #[INIT-CMD_, 0x08, 0x00]
+    sleep --ms=40
+    check-busy-bit_
+    return
+
+  /**
+  Whether the device calibration is complete.
+  */
+  is-calibrated -> bool:
+    return read-status & CALIBRATED_ != 0
+
+  /**
+  Initialise the sensor.
+  */
+  initialize -> none:
+    dev_.write #[INIT-CMD_, 0x08, 0x00]
+    // Requires 100ms after startup before reading temperature.  Some time is
+    // taken to boot the ESP32 - remaining time guesstimate = 10ms.
+    sleep --ms=10
