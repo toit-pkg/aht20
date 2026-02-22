@@ -74,12 +74,6 @@ class Aht20:
     it is a better measure of true moisture content, independent of current
     temperature.  In other words - it is the temperature at which condensation
     would start to form.
-
-  Dew point is calculated here from temperature and humidity reads and based on
-    Magnus approximation.  It is returned in degrees Celsius.  Default constants
-    are $barometric-pressure = 243.12c, and $water-vapor = 17.62, and are
-    typical values for indoor/environmental use.  They can be set to other
-    fitting values as the use case dictates.
   */
   read-dew-point:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
@@ -109,9 +103,6 @@ class Aht20:
 
   /**
   Wait for busy bit to clear to indicate idle state.
-
-  Waits a maximum of $tries * $sleep-ms.  If timeout exceeded, will log and
-    will not throw.
   */
   check-busy-bit_:
     tries := 5
