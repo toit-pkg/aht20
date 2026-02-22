@@ -54,7 +54,7 @@ class Aht20:
     sleep --ms=80
 
     check-busy-bit_
-    dat := dev_.read 6
+    dat := dev_.read RETURN-BYTES_
     return compute-hum_ dat
 
   /**
@@ -67,7 +67,7 @@ class Aht20:
     sleep --ms=80
 
     check-busy-bit_
-    dat := dev_.read 6
+    dat := dev_.read RETURN-BYTES_
     return compute-temp_ dat
 
   /**
@@ -87,7 +87,9 @@ class Aht20:
     typical values for indoor/environmental use.  They can be set to other
     fitting values as the use case dictates.
   */
-  read-dew-point --barometric-pressure=BAROMETRIC-PRESSURE --water-vapor=WATER-VAPOR -> float:
+  read-dew-point -> float
+      --barometric-pressure/float=BAROMETRIC-PRESSURE
+      --water-vapor/float=WATER-VAPOR:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
     sleep --ms=80
     check-busy-bit_
@@ -102,14 +104,14 @@ class Aht20:
   /**
   Compute humidity from the raw byte array.
   */
-  compute-hum_ dat -> float:
+  compute-hum_ dat/ByteArray -> float:
     hum := ((dat[1] << 16) | (dat[2] << 8) | dat[3]) >> 4
     return hum * 100.0 / 1048576
 
   /**
   Compute temperature from the raw byte array.
   */
-  compute-temp_ dat -> float:
+  compute-temp_ dat/ByteArray -> float:
     temp := ((dat[3] & 0x0F) << 16) | (dat[4] << 8) | dat[5]
     return ((200.0 * temp) / 1048576) - 50
 
@@ -126,13 +128,13 @@ class Aht20:
   /**
   Perform a soft reset.
   */
-  soft-reset:
+  soft-reset -> none:
     dev_.write #[RESET-CMD_]
 
   /**
   Read sensor status.
   */
-  read-status:
+  read-status -> int:
     dev_.write #[STATUS-CMD_]
     return (dev_.read 1)[0]
 
