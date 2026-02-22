@@ -24,7 +24,7 @@ class Aht20:
   static RETURN-BYTES_ ::= 6
 
   static WATER-VAPOR ::= 17.62
-  static BAROMETRIC-PRESSURE ::= 243.5
+  static BAROMETRIC-PRESSURE ::= 243.12
 
   dev_/serial.Device ::= ?
   logger_/log.Logger ::= ?
