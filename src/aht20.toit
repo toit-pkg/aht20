@@ -35,23 +35,21 @@ class Aht20:
 
     // Initialize the sensor.
     sleep --ms=40
-    dev_.write #[INIT-CMD_, 0x08, 0x00]
+    initialize
 
-    // Requires 100ms after startup before reading temperature.  Some time is taken
-    // to boot the ESP32 - remaining time assumed is 10ms.
-    sleep --ms=10
-
-    // Verify the calibration bit.
-    s := read-status
-    if (s & 0x08 != 0x08) :
-      throw "failed initialization"
+    // Verify calibration is complete by checking calibration bit.
+    if not is-calibrated:
+      logger_.warn "device not calibrated - calibrating"
+      run-calibration
+      if not is-calibrated:
+        throw "device initialization failed"
 
   /**
   Reads the humidity.
 
   Humidity is returned in percentage value.
   */
-  read-humidity:
+  read-humidity -> float:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
     sleep --ms=80
 
@@ -64,7 +62,7 @@ class Aht20:
 
   Temperature is returned in degrees Celsius.
   */
-  read-temperature:
+  read-temperature -> float:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
     sleep --ms=80
 
@@ -83,7 +81,7 @@ class Aht20:
     temperature.  In other words - it is the temperature at which condensation
     would start to form.
   */
-  read-dew-point:
+  read-dew-point -> float:
     dev_.write #[MEASURE-CMD_, 0x33, 0x00]
     sleep --ms=80
 
@@ -98,14 +96,14 @@ class Aht20:
   /**
   Compute humidity from the raw byte array.
   */
-  compute-hum_ dat:
+  compute-hum_ dat -> float:
     hum := ((dat[1] << 16) | (dat[2] << 8) | dat[3]) >> 4
     return hum * 100.0 / 1048576
 
   /**
   Compute temperature from the raw byte array.
   */
-  compute-temp_ dat:
+  compute-temp_ dat -> float:
     temp := ((dat[3] & 0x0F) << 16) | (dat[4] << 8) | dat[5]
     return ((200.0 * temp) / 1048576) - 50
 
@@ -152,4 +150,6 @@ class Aht20:
   */
   initialize -> none:
     dev_.write #[INIT-CMD_, 0x08, 0x00]
+    // Requires 100ms after startup before reading temperature.  Some time is
+    // taken to boot the ESP32 - remaining time guesstimate = 10ms.
     sleep --ms=10
